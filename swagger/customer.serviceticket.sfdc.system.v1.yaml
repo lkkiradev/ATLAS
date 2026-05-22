@@ -684,6 +684,7 @@ components:
             - customer
             - location
             - createdAt
+            - dueDate
           properties:
             id:
               type: string
@@ -698,6 +699,14 @@ components:
               $ref: '#/components/schemas/Customer'
             location:
               $ref: '#/components/schemas/Location'
+            dueDate:
+              type: string
+              format: date-time
+              description: >
+                Target completion date and time for the service ticket.
+                Populated when the ticket transitions to IN-PROGRESS status.
+                Absent or null for OPEN and CLOSED tickets.
+              example: "2026-05-15T17:00:00Z"
             createdAt:
               type: string
               format: date-time
@@ -829,7 +838,8 @@ components:
             zipCode: "33101"
             line1: "220 Brickell Avenue"
             line2: "Floors 3-4"
-          createdAt: "2026-05-01T09:00:00Z"
+          dueDate: "2026-05-12T16:45:00Z"
+          createdAt: "2026-05-10T09:00:00Z"
           updatedAt: "2026-05-10T16:45:00Z"
 
     CreateTicketRequestExample:
@@ -871,3 +881,4 @@ components:
         priority: "CRITICAL"
         slaCategory: "EMERGENCY"
         issueDescription: "Escalated - pipe burst confirmed, immediate dispatch required."
+        dueDate: "2026-05-12T16:45:00Z"
