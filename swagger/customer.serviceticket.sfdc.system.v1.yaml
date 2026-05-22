@@ -1,0 +1,873 @@
+openapi: 3.0.3
+info:
+  title: Customer Service Ticket SFDC System API
+  description: |
+    Purpose:
+    This API provides access to customer service ticket management backed by Salesforce (SFDC).
+    It enables internal systems to create, retrieve, and update service tickets on behalf of customers.
+
+    Business Scope:
+    This is a System API used by internal applications that need to interact with field service
+    ticket data. It does not implement business process orchestration or business rules beyond
+    what is exposed by the underlying Salesforce platform.
+
+    Objective:
+    - Expose service ticket data for read and write operations.
+    - Enable consistent consumption of ticket data across applications.
+    - Avoid direct access to the underlying Salesforce instance by consumer systems.
+  version: 1.0.0
+  x-hopex:
+    - componentCode: CP000000
+  x-api-type: system
+  x-domain: customer/serviceticket
+  x-source-system:
+    - Salesforce
+  x-contacts:
+    - type: api-lead
+      name: HO Digital Factory Governance
+      email: ho.ApiDesignGov@optivio.com
+    - type: api-factory
+      name: core-it-factory
+      email: HO.core-it-factory@optivio.com
+  x-observability:
+    - tool: dynatrace
+      url: xxx/xxx/xxx
+      env: prod
+
+servers:
+  - url: https://digital-apis.optivio.com/customer/serviceticket/sfdc/system/v1
+    description: OptiVio internal Gateway PROD
+  - url: https://digital-apis-pre.optivio.com/customer/serviceticket/sfdc/system/v1
+    description: OptiVio internal Gateway PreProd
+  - url: https://digital-apis-uat.optivio.com/customer/serviceticket/sfdc/system/v1
+    description: OptiVio internal Gateway UAT
+
+tags:
+  - name: Ticket Management
+    description: Operations for creating, retrieving, and updating service tickets
+  - name: Customer Tickets
+    description: Operations for retrieving service tickets scoped to a specific customer
+
+paths:
+
+  /tickets:
+    get:
+      tags:
+        - Ticket Management
+      operationId: getTickets
+      summary: Retrieve all service tickets
+      description: |
+        Returns a paginated list of service tickets. Results can be filtered using
+        optional query parameters. Supports pagination via the `range` header (default 0-49, max 50 rows).
+      parameters:
+        - name: status
+          in: query
+          description: Filter tickets by current status
+          required: false
+          schema:
+            type: string
+            enum: [OPEN, CLOSED, IN-PROGRESS]
+          example: OPEN
+        - name: priority
+          in: query
+          description: Filter tickets by operational priority
+          required: false
+          schema:
+            type: string
+            enum: [LOW, MEDIUM, HIGH, CRITICAL]
+          example: HIGH
+        - name: slaCategory
+          in: query
+          description: Filter tickets by SLA category
+          required: false
+          schema:
+            type: string
+            enum: [STANDARD, EXPRESS, EMERGENCY]
+          example: EMERGENCY
+        - name: serviceType
+          in: query
+          description: Filter tickets by service type
+          required: false
+          schema:
+            type: string
+          example: "Water System Inspection"
+        - name: x-consumer-app
+          in: header
+          description: Name of the application consuming this API
+          required: true
+          schema:
+            type: string
+          example: "FIELD-OPS"
+        - name: range
+          in: header
+          description: Pagination parameter. Default 0-49. Maximum rows to return is 50.
+          required: false
+          schema:
+            type: string
+            default: 0-49
+          example: "0-49"
+      responses:
+        '200':
+          description: Successful Operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ticket'
+              examples:
+                Example_1:
+                  $ref: '#/components/examples/TicketListExample'
+        '206':
+          description: Partial Content - paginated response
+          headers:
+            Content-Range:
+              $ref: '#/components/headers/Content-Range'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ticket'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '416':
+          $ref: '#/components/responses/BadRange'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        default:
+          $ref: '#/components/responses/Default'
+      security:
+        - oAuth2:
+            - 'serviceticket:read:be'
+
+    post:
+      tags:
+        - Ticket Management
+      operationId: createTicket
+      summary: Create a new service ticket
+      description: |
+        Creates a new service ticket in Salesforce.
+      parameters:
+        - name: x-consumer-app
+          in: header
+          description: Name of the application consuming this API
+          required: true
+          schema:
+            type: string
+          example: "FIELD-OPS"
+      requestBody:
+        description: Service ticket creation payload
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTicketRequest'
+            examples:
+              Example_1:
+                $ref: '#/components/examples/CreateTicketRequestExample'
+      responses:
+        '201':
+          description: Service ticket successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+              examples:
+                Example_1:
+                  $ref: '#/components/examples/TicketExample'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        default:
+          $ref: '#/components/responses/Default'
+      security:
+        - oAuth2:
+            - 'serviceticket:write:be'
+
+  /tickets/{id}:
+    get:
+      tags:
+        - Ticket Management
+      operationId: getTicketById
+      summary: Retrieve a service ticket by ID
+      description: Returns a single service ticket identified by its unique ticket ID.
+      parameters:
+        - name: id
+          in: path
+          description: Unique identifier of the service ticket
+          required: true
+          schema:
+            type: string
+          example: "REQ-27481"
+        - name: x-consumer-app
+          in: header
+          description: Name of the application consuming this API
+          required: true
+          schema:
+            type: string
+          example: "FIELD-OPS"
+      responses:
+        '200':
+          description: Successful Operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+              examples:
+                Example_1:
+                  $ref: '#/components/examples/TicketExample'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        default:
+          $ref: '#/components/responses/Default'
+      security:
+        - oAuth2:
+            - 'serviceticket:read:be'
+
+    patch:
+      tags:
+        - Ticket Management
+      operationId: updateTicket
+      summary: Partially update a service ticket
+      description: |
+        Updates one or more fields of an existing service ticket. Only the fields provided
+        in the request body will be updated. The `updatedAt` timestamp is auto-generated
+        by the platform upon successful update.
+      parameters:
+        - name: id
+          in: path
+          description: Unique identifier of the service ticket
+          required: true
+          schema:
+            type: string
+          example: "REQ-27481"
+        - name: x-consumer-app
+          in: header
+          description: Name of the application consuming this API
+          required: true
+          schema:
+            type: string
+          example: "FIELD-OPS"
+      requestBody:
+        description: Partial service ticket update payload
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchTicketRequest'
+            examples:
+              Example_1:
+                $ref: '#/components/examples/PatchTicketRequestExample'
+      responses:
+        '200':
+          description: Service ticket successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+              examples:
+                Example_1:
+                  $ref: '#/components/examples/TicketExample'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        default:
+          $ref: '#/components/responses/Default'
+      security:
+        - oAuth2:
+            - 'serviceticket:write:be'
+
+  /customers/{id}/tickets:
+    get:
+      tags:
+        - Customer Tickets
+      operationId: getTicketsByCustomerId
+      summary: Retrieve all service tickets for a specific customer
+      description: |
+        Returns a paginated list of service tickets associated with the given customer ID.
+        Supports pagination via the `range` header (default 0-49, max 50 rows).
+      parameters:
+        - name: id
+          in: path
+          description: Unique identifier of the customer (client)
+          required: true
+          schema:
+            type: string
+          example: "AMC-002"
+        - name: status
+          in: query
+          description: Filter tickets by current status
+          required: false
+          schema:
+            type: string
+            enum: [OPEN, CLOSED, IN-PROGRESS]
+          example: OPEN
+        - name: priority
+          in: query
+          description: Filter tickets by operational priority
+          required: false
+          schema:
+            type: string
+            enum: [LOW, MEDIUM, HIGH, CRITICAL]
+          example: HIGH
+        - name: x-consumer-app
+          in: header
+          description: Name of the application consuming this API
+          required: true
+          schema:
+            type: string
+          example: "FIELD-OPS"
+        - name: range
+          in: header
+          description: Pagination parameter. Default 0-49. Maximum rows to return is 50.
+          required: false
+          schema:
+            type: string
+            default: 0-49
+          example: "0-49"
+      responses:
+        '200':
+          description: Successful Operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ticket'
+              examples:
+                Example_1:
+                  $ref: '#/components/examples/TicketListExample'
+        '206':
+          description: Partial Content - paginated response
+          headers:
+            Content-Range:
+              $ref: '#/components/headers/Content-Range'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ticket'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '416':
+          $ref: '#/components/responses/BadRange'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        default:
+          $ref: '#/components/responses/Default'
+      security:
+        - oAuth2:
+            - 'serviceticket:read:be'
+
+components:
+
+  securitySchemes:
+    oAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: 'https://auth.optivio.com/as/token.oauth2'
+          scopes:
+            'serviceticket:read:be': Read access for service ticket data
+            'serviceticket:write:be': Write access for service ticket data
+
+  headers:
+    Content-Range:
+      schema:
+        type: string
+        example: '50-64/65'
+      description: 'Returned pagination range.'
+
+  responses:
+    NotFound:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 404 Not Found<br>
+        Code - RES_ERR<br>
+        Description - The requested resource could not be found. Verify the ID and try again.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    BadRequest:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 400 Bad Request<br>
+        Code - BP_ERR<br>
+        Description - The request could not be understood or was missing required parameters.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    Unauthorized:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 401 Unauthorized<br>
+        Code - AUTH_ERR<br>
+        Description - Authentication credentials were missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    Forbidden:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 403 Forbidden<br>
+        Code - AUTHZ_ERR<br>
+        Description - The authenticated principal does not have permission to perform this action.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    InternalError:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 500 Internal Server Error<br>
+        Code - SVR_ERR<br>
+        Description - An error has occurred within the platform. Contact support if this persists.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    BadRange:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 416 Range Not Satisfiable<br>
+        Code - RANGE_ERR<br>
+        Description - The provided range is not satisfiable for the available dataset.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    Default:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+
+  schemas:
+
+    Client:
+      type: object
+      description: Represents the business client (company) that owns the service account.
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the client
+          example: "AMC-002"
+        name:
+          type: string
+          description: Full legal name of the client
+          example: "AquaSure Maintenance Corp."
+
+    Address:
+      type: object
+      description: Postal address sub-object.
+      properties:
+        line1:
+          type: string
+          description: Primary address line
+          example: "57236 Canary Road"
+        line2:
+          type: string
+          description: Secondary address line (suite, PO Box, etc.)
+          example: "PO Box 91764"
+
+    Contact:
+      type: object
+      description: Contact information for a person.
+      required:
+        - phone
+      properties:
+        phone:
+          type: string
+          description: Primary phone number
+          example: "786-599-3096"
+        email:
+          type: string
+          format: email
+          description: Email address
+          example: "emahmood0@github.com"
+
+    Customer:
+      type: object
+      description: Represents the individual account holder (end customer) associated with the service ticket.
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the account holder
+          example: "25659"
+        firstname:
+          type: string
+          description: First name of the account holder
+          example: "Erv"
+        lastname:
+          type: string
+          description: Last name of the account holder
+          example: "Mahmood"
+        address:
+          $ref: '#/components/schemas/Address'
+        contact:
+          $ref: '#/components/schemas/Contact'
+
+    Location:
+      type: object
+      description: Physical location where the service is to be performed.
+      required:
+        - city
+        - zipCode
+        - line1
+      properties:
+        city:
+          type: string
+          description: City of the service location
+          example: "Chickasaw"
+        zipCode:
+          type: string
+          description: ZIP or postal code
+          example: "36611"
+        line1:
+          type: string
+          description: Primary street address
+          example: "57236 Canary Road"
+        line2:
+          type: string
+          description: Secondary address line (unit, building, etc.)
+          example: "PO Box 91764"
+
+
+    TicketBase:
+      type: object
+      description: Core fields shared across ticket request and response objects.
+      properties:
+        status:
+          type: string
+          description: Current lifecycle status of the service ticket
+          enum: [OPEN, CLOSED, IN-PROGRESS]
+          example: "OPEN"
+        serviceType:
+          type: string
+          description: Type of service requested
+          example: "Water System Inspection"
+        serviceEnvironment:
+          type: string
+          description: Environment where the service will be performed
+          enum: [INDOOR, OUTDOOR, MIXED]
+          example: "INDOOR"
+        category:
+          type: string
+          description: Service category for classification and routing
+          example: "Water & Plumbing"
+        priority:
+          type: string
+          description: >
+            Operational priority of the service request. Influences scheduling,
+            dispatching, SLA enforcement, and technician allocation.
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+          example: "HIGH"
+        slaCategory:
+          type: string
+          description: >
+            SLA tier that governs response and resolution time commitments.
+            Affects scheduling eligibility and dispatch urgency.
+          enum: [STANDARD, EXPRESS, EMERGENCY]
+          example: "EMERGENCY"
+        serviceLevel:
+          type: string
+          description: >
+            Customer service tier. Influences scheduling priority, 
+            dispatch rules, and resource allocation.
+          enum: [GOLD, SILVER, BRONZE]
+          example: "GOLD"
+        assetType:
+          type: string
+          description: >
+            Type of asset targeted by the service request.
+            Used for technician skill matching and parts preparation.
+          example: "WATER_PIPELINE"
+        issueDescription:
+          type: string
+          description: Free-text description of the issue reported by the customer or account holder.
+          example: "Water pressure anomaly detected in underground pipe section."
+        technicianRequiredSkill:
+          type: string
+          description: >
+            Required technician certification or skill set for this ticket.
+            Used by scheduling systems for technician assignment.
+          example: "PLUMBING_CERTIFIED"
+
+    CreateTicketRequest:
+      allOf:
+        - $ref: '#/components/schemas/TicketBase'
+        - type: object
+          description: Payload for creating a new service ticket.
+          required:
+            - status
+            - serviceType
+            - serviceEnvironment
+            - priority
+            - client
+            - customer
+            - location
+          properties:
+            client:
+              $ref: '#/components/schemas/Client'
+            customer:
+              $ref: '#/components/schemas/Customer'
+            location:
+              $ref: '#/components/schemas/Location'
+
+    PatchTicketRequest:
+      allOf:
+        - $ref: '#/components/schemas/TicketBase'
+        - type: object
+          description: >
+            Partial update payload for an existing service ticket. All fields are optional;
+            only provided fields will be updated. The updatedAt timestamp is auto-generated by the platform.
+          properties:
+            client:
+              $ref: '#/components/schemas/Client'
+            customer:
+              $ref: '#/components/schemas/Customer'
+            location:
+              $ref: '#/components/schemas/Location'
+
+    Ticket:
+      allOf:
+        - type: object
+          description: Full service ticket representation including platform-generated metadata.
+          required:
+            - id
+            - status
+            - serviceType
+            - serviceEnvironment
+            - priority
+            - client
+            - customer
+            - location
+            - createdAt
+          properties:
+            id:
+              type: string
+              description: Unique identifier of the service ticket, generated by Salesforce
+              example: "REQ-27481"
+        - $ref: '#/components/schemas/TicketBase'
+        - type: object
+          properties:
+            client:
+              $ref: '#/components/schemas/Client'
+            customer:
+              $ref: '#/components/schemas/Customer'
+            location:
+              $ref: '#/components/schemas/Location'
+            createdAt:
+              type: string
+              format: date-time
+              description: Timestamp when the ticket was created. Auto-generated by Salesforce.
+              example: "2026-04-12T14:30:00Z"
+            updatedAt:
+              type: string
+              format: date-time
+              description: Timestamp of the last update to the ticket. Auto-generated by Salesforce on modification.
+              example: "2026-05-12T14:30:00Z"
+
+  
+
+    Fault:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+          description: >
+            HTTP error label or free-text cause such as: Database Not Available,
+            Invalid Credential, Mandatory Field Missing, Invalid Format, Invalid Length,
+            Forbidden Value, Invalid Data, etc.
+          example: "400 Bad Request"
+        code:
+          type: string
+          description: Error identifier — application error code, Salesforce error code, etc.
+          example: "BP_ERR"
+        description:
+          type: string
+          description: Human-readable error description including relevant field and value context.
+          example: "Field 'priority' contains an unrecognized value. Accepted values are: LOW, MEDIUM, HIGH, CRITICAL."
+
+  examples:
+
+    TicketExample:
+      summary: A fully populated service ticket
+      value:
+        id: "REQ-27481"
+        status: "OPEN"
+        serviceType: "Water System Inspection"
+        serviceEnvironment: "INDOOR"
+        category: "Water & Plumbing"
+        priority: "HIGH"
+        slaCategory: "EXPRESS"
+        serviceLevel: "GOLD"
+        assetType: "WATER_PIPELINE"
+        issueDescription: "Water pressure anomaly detected in underground pipe section."
+        technicianRequiredSkill: "PLUMBING_CERTIFIED"
+        client:
+          id: "AMC-002"
+          name: "AquaSure Maintenance Corp."
+        customer:
+          id: "25659"
+          firstname: "Erv"
+          lastname: "Mahmood"
+          address:
+            line1: "57236 Canary Road"
+            line2: "PO Box 91764"
+          contact:
+            phone: "786-599-3096"
+            email: "emahmood0@github.com"
+        location:
+          city: "Chickasaw"
+          zipCode: "36611"
+          line1: "57236 Canary Road"
+          line2: "PO Box 91764"
+        createdAt: "2026-04-12T14:30:00Z"
+        updatedAt: "2026-05-12T14:30:00Z"
+
+    TicketListExample:
+      summary: A list of service tickets
+      value:
+        - id: "REQ-27481"
+          status: "OPEN"
+          serviceType: "Water System Inspection"
+          serviceEnvironment: "INDOOR"
+          category: "Water & Plumbing"
+          priority: "HIGH"
+          slaCategory: "EXPRESS"
+          serviceLevel: "GOLD"
+          assetType: "WATER_PIPELINE"
+          issueDescription: "Water pressure anomaly detected in underground pipe section."
+          technicianRequiredSkill: "PLUMBING_CERTIFIED"
+          client:
+            id: "AMC-002"
+            name: "AquaSure Maintenance Corp."
+          customer:
+            id: "25659"
+            firstname: "Erv"
+            lastname: "Mahmood"
+            address:
+              line1: "57236 Canary Road"
+              line2: "PO Box 91764"
+            contact:
+              phone: "786-599-3096"
+              email: "emahmood0@github.com"
+          location:
+            city: "Chickasaw"
+            zipCode: "36611"
+            line1: "57236 Canary Road"
+            line2: "PO Box 91764"
+          createdAt: "2026-04-12T14:30:00Z"
+          updatedAt: "2026-05-12T14:30:00Z"
+        - id: "REQ-27482"
+          status: "IN-PROGRESS"
+          serviceType: "HVAC Maintenance"
+          serviceEnvironment: "MIXED"
+          category: "HVAC"
+          priority: "CRITICAL"
+          slaCategory: "EMERGENCY"
+          serviceLevel: "GOLD"
+          assetType: "HVAC_UNIT"
+          issueDescription: "Complete HVAC unit failure reported across floors 3 and 4."
+          technicianRequiredSkill: "HVAC_CERTIFIED"
+          client:
+            id: "TGC-018"
+            name: "ThermoGlobe Commercial Ltd."
+          customer:
+            id: "31042"
+            firstname: "Sandra"
+            lastname: "Reyes"
+            contact:
+              phone: "305-774-2210"
+              email: "sreyes@thermoglobe.com"
+          location:
+            city: "Miami"
+            zipCode: "33101"
+            line1: "220 Brickell Avenue"
+            line2: "Floors 3-4"
+          createdAt: "2026-05-01T09:00:00Z"
+          updatedAt: "2026-05-10T16:45:00Z"
+
+    CreateTicketRequestExample:
+      summary: Create service ticket request body
+      value:
+        status: "OPEN"
+        serviceType: "Water System Inspection"
+        serviceEnvironment: "INDOOR"
+        category: "Water & Plumbing"
+        priority: "HIGH"
+        slaCategory: "EXPRESS"
+        serviceLevel: "GOLD"
+        assetType: "WATER_PIPELINE"
+        issueDescription: "Water pressure anomaly detected in underground pipe section."
+        technicianRequiredSkill: "PLUMBING_CERTIFIED"
+        client:
+          id: "AMC-002"
+          name: "AquaSure Maintenance Corp."
+        customer:
+          id: "25659"
+          firstname: "Erv"
+          lastname: "Mahmood"
+          address:
+            line1: "57236 Canary Road"
+            line2: "PO Box 91764"
+          contact:
+            phone: "786-599-3096"
+            email: "emahmood0@github.com"
+        location:
+          city: "Chickasaw"
+          zipCode: "36611"
+          line1: "57236 Canary Road"
+          line2: "PO Box 91764"
+
+    PatchTicketRequestExample:
+      summary: Patch service ticket request body
+      value:
+        status: "IN-PROGRESS"
+        priority: "CRITICAL"
+        slaCategory: "EMERGENCY"
+        issueDescription: "Escalated - pipe burst confirmed, immediate dispatch required."
