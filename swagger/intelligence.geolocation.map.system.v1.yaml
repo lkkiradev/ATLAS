@@ -1,0 +1,353 @@
+openapi: 3.0.3
+info:
+  title: Geolocation Map System API
+  description: |
+    Purpose:
+    This API provides geolocation capabilities by interfacing with an external
+    geolocation provider. It converts structured address inputs into geographic
+    coordinates and returns normalized location metadata.
+
+    Business Scope:
+    This is a System API used by internal applications that require address-to-coordinate
+    resolution, location normalization, and geographical metadata enrichment. It acts as
+    an abstraction layer over the external geolocation provider, shielding consumers from
+    third-party API contracts and changes.
+
+    Objective:
+    - Convert structured address inputs into latitude/longitude coordinates.
+    - Retrieve normalized and enriched geographical metadata.
+    - Standardize location information across internal systems.
+  version: 1.0.0
+  x-hopex:
+    - componentCode: CP000000
+  x-api-type: system
+  x-domain: intelligence
+  x-source-system:
+    - External Geolocation API
+  x-contacts:
+    - type: api-lead
+      name: HO Digital Factory Governance
+      email: ho.ApiDesignGov@optivio.com
+    - type: api-factory
+      name: core-it-factory
+      email: HO.core-it-factory@optivio.com
+  x-observability:
+    - tool: dynatrace
+      url: xxx/xxx/xxx
+      env: prod
+
+servers:
+  - url: https://digital-apis.optivio.com/intelligence/geolocation/map/system/v1
+    description: OptiVio internal Gateway PROD
+  - url: https://digital-apis-pre.optivio.com/intelligence/geolocation/map/system/v1
+    description: OptiVio internal Gateway PreProd
+  - url: https://digital-apis-uat.optivio.com/intelligence/geolocation/map/system/v1
+    description: OptiVio internal Gateway UAT
+
+tags:
+  - name: Geolocation
+    description: Operations for address resolution and geographical metadata retrieval
+
+paths:
+
+  /geocode:
+    post:
+      tags:
+        - Geolocation
+      operationId: geocodeAddress
+      summary: Convert a structured address into coordinates and location metadata
+      description: |
+        Accepts a structured address and returns the resolved latitude/longitude coordinates
+        along with normalized geographical metadata sourced from the external geolocation
+        provider. All fields in the request body are optional individually, but at minimum
+        a resolvable combination of fields must be provided (e.g. `line1` + `city` + `country`).
+      parameters:
+        - name: x-consumer-app
+          in: header
+          description: Name of the application consuming this API
+          required: true
+          schema:
+            type: string
+          example: "FIELD-OPS"
+      requestBody:
+        description: Structured address to be geocoded
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GeocodeRequest'
+            examples:
+              Example_1:
+                $ref: '#/components/examples/GeocodeRequestExample'
+      responses:
+        '200':
+          description: Successful Operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeocodeResponse'
+              examples:
+                Example_1:
+                  $ref: '#/components/examples/GeocodeResponseExample'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        default:
+          $ref: '#/components/responses/Default'
+      security:
+        - oAuth2:
+            - 'geolocation:read:be'
+
+components:
+
+  securitySchemes:
+    oAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: 'https://auth.optivio.com/as/token.oauth2'
+          scopes:
+            'geolocation:read:be': Read access for geolocation resolution
+
+  responses:
+    NotFound:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 404 Not Found<br>
+        Code - RES_ERR<br>
+        Description - The provided address could not be resolved to a known location.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    BadRequest:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 400 Bad Request<br>
+        Code - BP_ERR<br>
+        Description - The request could not be understood or was missing required parameters.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    Unauthorized:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 401 Unauthorized<br>
+        Code - AUTH_ERR<br>
+        Description - Authentication credentials were missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    Forbidden:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 403 Forbidden<br>
+        Code - AUTHZ_ERR<br>
+        Description - The authenticated principal does not have permission to perform this action.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    UnprocessableEntity:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 422 Unprocessable Entity<br>
+        Code - GEO_ERR<br>
+        Description - The address was understood but could not be geocoded. The input may be
+        ambiguous, incomplete, or not resolvable by the geolocation provider.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    InternalError:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 500 Internal Server Error<br>
+        Code - SVR_ERR<br>
+        Description - An error has occurred within the platform. Contact support if this persists.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    BadGateway:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 502 Bad Gateway<br>
+        Code - GW_ERR<br>
+        Description - The external geolocation provider returned an invalid or unexpected response.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    Default:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+
+  schemas:
+
+    GeocodeRequest:
+      type: object
+      description: >
+        Structured address input for geocoding. At minimum, a resolvable combination
+        of fields must be provided. Recommended minimum: line1 + city + country.
+      properties:
+        line1:
+          type: string
+          description: Primary street address line
+          example: "57236 Canary Road"
+        line2:
+          type: string
+          description: Secondary address line (unit, suite, PO Box, etc.)
+          example: "PO Box 91764"
+        city:
+          type: string
+          description: City or municipality
+          example: "Chickasaw"
+        state:
+          type: string
+          description: State, province, or region
+          example: "Alabama"
+        zipCode:
+          type: string
+          description: ZIP or postal code
+          example: "36611"
+        country:
+          type: string
+          description: Country name or ISO 3166-1 alpha-2 country code
+          example: "US"
+
+    Coordinates:
+      type: object
+      description: Geographic coordinates resolved from the input address.
+      required:
+        - latitude
+        - longitude
+      properties:
+        latitude:
+          type: number
+          format: double
+          description: Latitude in decimal degrees (WGS 84)
+          example: 30.6954
+        longitude:
+          type: number
+          format: double
+          description: Longitude in decimal degrees (WGS 84)
+          example: -88.0737
+
+    NormalizedLocation:
+      type: object
+      description: Normalized and enriched location metadata returned by the geolocation provider.
+      properties:
+        formattedAddress:
+          type: string
+          description: Full normalized address as resolved by the geolocation provider
+          example: "57236 Canary Road, Chickasaw, AL 36611, USA"
+        line1:
+          type: string
+          description: Normalized primary street address line
+          example: "57236 Canary Road"
+        city:
+          type: string
+          description: Normalized city or municipality name
+          example: "Chickasaw"
+        state:
+          type: string
+          description: Full state or province name
+          example: "Alabama"
+        stateCode:
+          type: string
+          description: ISO 3166-2 state or province code
+          example: "AL"
+        zipCode:
+          type: string
+          description: Normalized ZIP or postal code
+          example: "36611"
+        country:
+          type: string
+          description: Full country name
+          example: "United States"
+        countryCode:
+          type: string
+          description: ISO 3166-1 alpha-2 country code
+          example: "US"
+        timezone:
+          type: string
+          description: IANA timezone identifier for the resolved location
+          example: "America/Chicago"
+
+    GeocodeResponse:
+      type: object
+      description: Geocoding result containing resolved coordinates and normalized location metadata.
+      required:
+        - coordinates
+      properties:
+        coordinates:
+          $ref: '#/components/schemas/Coordinates'
+        normalizedLocation:
+          $ref: '#/components/schemas/NormalizedLocation'
+
+
+    Fault:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+          description: >
+            HTTP error label or free-text cause such as: External Provider Unavailable,
+            Address Not Resolvable, Invalid Format, Mandatory Field Missing, etc.
+          example: "422 Unprocessable Entity"
+        code:
+          type: string
+          description: Error identifier — application error code or provider error code.
+          example: "GEO_ERR"
+        description:
+          type: string
+          description: Human-readable error description including relevant field and value context.
+          example: "The provided address could not be geocoded. Verify that the address is complete and accurate."
+
+  examples:
+
+    GeocodeRequestExample:
+      summary: A structured address geocoding request
+      value:
+        line1: "57236 Canary Road"
+        line2: "PO Box 91764"
+        city: "Chickasaw"
+        state: "Alabama"
+        zipCode: "36611"
+        country: "US"
+
+    GeocodeResponseExample:
+      summary: Resolved coordinates and normalized location metadata
+      value:
+        coordinates:
+          latitude: 30.6954
+          longitude: -88.0737
+        normalizedLocation:
+          formattedAddress: "57236 Canary Road, Chickasaw, AL 36611, USA"
+          line1: "57236 Canary Road"
+          city: "Chickasaw"
+          state: "Alabama"
+          stateCode: "AL"
+          zipCode: "36611"
+          country: "United States"
+          countryCode: "US"
+          timezone: "America/Chicago"
