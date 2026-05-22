@@ -1,0 +1,569 @@
+openapi: 3.0.3
+info:
+  title: Atlas Technician DynamoDB System API
+  description: |
+    Purpose:
+    This API provides read access to technician data sourced from AWS DynamoDB.
+    It enables internal systems to retrieve technician profiles, specialties,
+    and assigned service tickets.
+
+    Business Scope:
+    This is a System API used by internal applications that need technician
+    workforce data for integration and operational usage. It does not implement
+    business process orchestration, availability scheduling, or dispatch logic —
+    those concerns are handled at the Process API layer.
+
+    Objective:
+    - Expose technician profile and assignment data.
+    - Enable consistent consumption of technician data across applications.
+    - Avoid direct access to the underlying DynamoDB instance by consumer systems.
+  version: 1.0.0
+  x-hopex:
+    - componentCode: CP000000
+  x-api-type: system
+  x-domain: workforce
+  x-source-system:
+    - DynamoDB AWS
+  x-contacts:
+    - type: api-lead
+      name: HO Digital Factory Governance
+      email: ho.ApiDesignGov@optivio.com
+    - type: api-factory
+      name: core-it-factory
+      email: HO.core-it-factory@optivio.com
+  x-observability:
+    - tool: dynatrace
+      url: xxx/xxx/xxx
+      env: prod
+
+servers:
+  - url: https://digital-apis.optivio.com/workforce/technician/dynamodb/system/v1
+    description: OptiVio internal Gateway PROD
+  - url: https://digital-apis-pre.optivio.com/workforce/technician/dynamodb/system/v1
+    description: OptiVio internal Gateway PreProd
+  - url: https://digital-apis-uat.optivio.com/workforce/technician/dynamodb/system/v1
+    description: OptiVio internal Gateway UAT
+
+tags:
+  - name: Technician Management
+    description: Operations for retrieving technician profiles and assignment data
+
+paths:
+
+  /technicians:
+    get:
+      tags:
+        - Technician Management
+      operationId: getTechnicians
+      summary: Retrieve all technicians
+      description: |
+        Returns a paginated list of technician records including profile information,
+        specialty, and assigned service tickets. Supports pagination via the `range`
+        header (default 0-49, max 50 rows).
+      parameters:
+        - name: specialty
+          in: query
+          description: Filter technicians by specialty
+          required: false
+          schema:
+            type: string
+          example: "environmental"
+        - name: x-consumer-app
+          in: header
+          description: Name of the application consuming this API
+          required: true
+          schema:
+            type: string
+          example: "FIELD-OPS"
+        - name: range
+          in: header
+          description: Pagination parameter. Default 0-49. Maximum rows to return is 50.
+          required: false
+          schema:
+            type: string
+            default: 0-49
+          example: "0-49"
+      responses:
+        '200':
+          description: Successful Operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Technician'
+              examples:
+                Example_1:
+                  $ref: '#/components/examples/TechnicianListExample'
+        '206':
+          description: Partial Content - paginated response
+          headers:
+            Content-Range:
+              $ref: '#/components/headers/Content-Range'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Technician'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '416':
+          $ref: '#/components/responses/BadRange'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        default:
+          $ref: '#/components/responses/Default'
+      security:
+        - oAuth2:
+            - 'technician:read:be'
+
+  /technicians/{id}:
+    get:
+      tags:
+        - Technician Management
+      operationId: getTechnicianById
+      summary: Retrieve a technician by ID
+      description: Returns a single technician record identified by their unique technician ID,
+        including profile information, specialty, and assigned service tickets.
+      parameters:
+        - name: id
+          in: path
+          description: Unique identifier of the technician
+          required: true
+          schema:
+            type: string
+          example: "TCH-ENV-5610"
+        - name: x-consumer-app
+          in: header
+          description: Name of the application consuming this API
+          required: true
+          schema:
+            type: string
+          example: "FIELD-OPS"
+      responses:
+        '200':
+          description: Successful Operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Technician'
+              examples:
+                Example_1:
+                  $ref: '#/components/examples/TechnicianExample'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        default:
+          $ref: '#/components/responses/Default'
+      security:
+        - oAuth2:
+            - 'technician:read:be'
+
+  /technicians/{id}/tickets:
+    get:
+      tags:
+        - Technician Management
+      operationId: getTicketsByTechnicianId
+      summary: Retrieve all service tickets assigned to a technician
+      description: |
+        Returns a paginated list of full service ticket objects currently assigned
+        to the specified technician. Supports pagination via the `range` header
+        (default 0-49, max 50 rows).
+      parameters:
+        - name: id
+          in: path
+          description: Unique identifier of the technician
+          required: true
+          schema:
+            type: string
+          example: "TCH-ENV-5610"
+        - name: status
+          in: query
+          description: Filter assigned tickets by status
+          required: false
+          schema:
+            type: string
+            enum: [OPEN, CLOSED, IN-PROGRESS]
+          example: "IN-PROGRESS"
+        - name: x-consumer-app
+          in: header
+          description: Name of the application consuming this API
+          required: true
+          schema:
+            type: string
+          example: "FIELD-OPS"
+        - name: range
+          in: header
+          description: Pagination parameter. Default 0-49. Maximum rows to return is 50.
+          required: false
+          schema:
+            type: string
+            default: 0-49
+          example: "0-49"
+      responses:
+        '200':
+          description: Successful Operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssignedTicket'
+              examples:
+                Example_1:
+                  $ref: '#/components/examples/AssignedTicketListExample'
+        '206':
+          description: Partial Content - paginated response
+          headers:
+            Content-Range:
+              $ref: '#/components/headers/Content-Range'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssignedTicket'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '416':
+          $ref: '#/components/responses/BadRange'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        default:
+          $ref: '#/components/responses/Default'
+      security:
+        - oAuth2:
+            - 'technician:read:be'
+
+components:
+
+  securitySchemes:
+    oAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: 'https://auth.optivio.com/as/token.oauth2'
+          scopes:
+            'technician:read:be': Read access for technician workforce data
+
+  headers:
+    Content-Range:
+      schema:
+        type: string
+        example: '50-64/65'
+      description: 'Returned pagination range.'
+
+  responses:
+    NotFound:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 404 Not Found<br>
+        Code - RES_ERR<br>
+        Description - The requested resource could not be found. Verify the ID and try again.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    BadRequest:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 400 Bad Request<br>
+        Code - BP_ERR<br>
+        Description - The request could not be understood or was missing required parameters.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    Unauthorized:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 401 Unauthorized<br>
+        Code - AUTH_ERR<br>
+        Description - Authentication credentials were missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    Forbidden:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 403 Forbidden<br>
+        Code - AUTHZ_ERR<br>
+        Description - The authenticated principal does not have permission to perform this action.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    InternalError:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 500 Internal Server Error<br>
+        Code - SVR_ERR<br>
+        Description - An error has occurred within the platform. Contact support if this persists.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    BadRange:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 416 Range Not Satisfiable<br>
+        Code - RANGE_ERR<br>
+        Description - The provided range is not satisfiable for the available dataset.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    Default:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+
+  schemas:
+
+    TechnicianContact:
+      type: object
+      description: Contact information for a technician.
+      required:
+        - phone
+        - email
+      properties:
+        phone:
+          type: string
+          description: Primary phone number of the technician
+          example: "463-108-6180"
+        email:
+          type: string
+          format: email
+          description: Email address of the technician
+          example: "mprendergast0@nymag.com"
+
+    AssignedTicket:
+      type: object
+      description: A service ticket assigned to a technician. Reflects the full ticket record as sourced from the service ticket system.
+      required:
+        - id
+        - status
+        - serviceType
+        - serviceEnvironment
+        - priority
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the service ticket
+          example: "REQ-27481"
+        status:
+          type: string
+          description: Current lifecycle status of the service ticket
+          enum: [OPEN, CLOSED, IN-PROGRESS]
+          example: "IN-PROGRESS"
+        serviceType:
+          type: string
+          description: Type of service requested
+          example: "Water System Inspection"
+        serviceEnvironment:
+          type: string
+          description: Environment where the service will be performed
+          enum: [INDOOR, OUTDOOR, MIXED]
+          example: "INDOOR"
+        category:
+          type: string
+          description: Service category for classification and routing
+          example: "Water & Plumbing"
+        priority:
+          type: string
+          description: Operational priority of the service ticket
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+          example: "HIGH"
+        slaCategory:
+          type: string
+          description: SLA tier governing response and resolution time commitments
+          enum: [STANDARD, EXPRESS, EMERGENCY]
+          example: "EXPRESS"
+        serviceLevel:
+          type: string
+          description: Customer service tier
+          enum: [GOLD, SILVER, BRONZE]
+          example: "GOLD"
+        assetType:
+          type: string
+          description: Type of asset targeted by the service request
+          example: "WATER_PIPELINE"
+        issueDescription:
+          type: string
+          description: Free-text description of the reported issue
+          example: "Water pressure anomaly detected in underground pipe section."
+        technicianRequiredSkill:
+          type: string
+          description: Required technician certification or skill set for this ticket
+          example: "PLUMBING_CERTIFIED"
+        dueDate:
+          type: string
+          format: date-time
+          description: >
+            Target completion date and time for the service ticket.
+            Populated when the ticket transitions to IN-PROGRESS status.
+            Absent or null for OPEN and CLOSED tickets.
+          example: "2026-05-15T17:00:00Z"
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the ticket was created. Auto-generated by Salesforce.
+          example: "2026-04-12T14:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp of the last update. Auto-generated by Salesforce on modification.
+          example: "2026-05-12T14:30:00Z"
+
+    Technician:
+      type: object
+      description: Represents a field technician in the workforce system.
+      required:
+        - id
+        - firstname
+        - lastname
+        - specialty
+        - contact
+      properties:
+        id:
+          type: string
+          description: Unique identifier of the technician
+          example: "TCH-ENV-5610"
+        firstname:
+          type: string
+          description: First name of the technician
+          example: "Mitzi"
+        lastname:
+          type: string
+          description: Last name of the technician
+          example: "Prendergast"
+        specialty:
+          type: string
+          description: Area of technical expertise of the technician
+          example: "environmental"
+        contact:
+          $ref: '#/components/schemas/TechnicianContact'
+        tickets:
+          type: array
+          description: >
+            List of ticket IDs currently assigned to this technician.
+            Use GET /technicians/{id}/tickets for full ticket details.
+          items:
+            type: string
+          example: ["REQ-27481", "REQ-27482", "REQ-27483"]
+
+
+    Fault:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+          description: >
+            HTTP error label or free-text cause such as: Database Not Available,
+            Invalid Credential, Mandatory Field Missing, Invalid Format, Invalid Length,
+            Forbidden Value, Invalid Data, etc.
+          example: "400 Bad Request"
+        code:
+          type: string
+          description: Error identifier — application error code, DynamoDB error code, etc.
+          example: "BP_ERR"
+        description:
+          type: string
+          description: Human-readable error description including relevant field and value context.
+          example: "Field 'id' is missing or malformed. Expected format: TCH-XXX-XXXX."
+
+  examples:
+
+    TechnicianExample:
+      summary: A single technician record
+      value:
+        id: "TCH-ENV-5610"
+        firstname: "Mitzi"
+        lastname: "Prendergast"
+        specialty: "environmental"
+        contact:
+          phone: "463-108-6180"
+          email: "mprendergast0@nymag.com"
+        tickets:
+          - "REQ-27481"
+          - "REQ-27482"
+          - "REQ-27483"
+          - "REQ-27484"
+
+    TechnicianListExample:
+      summary: A list of technician records
+      value:
+        - id: "TCH-ENV-5610"
+          firstname: "Mitzi"
+          lastname: "Prendergast"
+          specialty: "environmental"
+          contact:
+            phone: "463-108-6180"
+            email: "mprendergast0@nymag.com"
+          tickets:
+            - "REQ-27481"
+            - "REQ-27482"
+            - "REQ-27483"
+            - "REQ-27484"
+        - id: "TCH-HVC-3301"
+          firstname: "Darren"
+          lastname: "Castillo"
+          specialty: "hvac"
+          contact:
+            phone: "512-334-7890"
+            email: "dcastillo@optivio.com"
+          tickets:
+            - "REQ-27483"
+
+    AssignedTicketListExample:
+      summary: Tickets assigned to a specific technician
+      value:
+        - id: "REQ-27481"
+          status: "IN-PROGRESS"
+          serviceType: "Water System Inspection"
+          serviceEnvironment: "INDOOR"
+          category: "Water & Plumbing"
+          priority: "HIGH"
+          slaCategory: "EXPRESS"
+          serviceLevel: "GOLD"
+          assetType: "WATER_PIPELINE"
+          issueDescription: "Water pressure anomaly detected in underground pipe section."
+          technicianRequiredSkill: "PLUMBING_CERTIFIED"
+          dueDate: "2026-05-15T17:00:00Z"
+          createdAt: "2026-04-12T14:30:00Z"
+          updatedAt: "2026-05-12T14:30:00Z"
+        - id: "REQ-27482"
+          status: "OPEN"
+          serviceType: "Soil Contamination Assessment"
+          serviceEnvironment: "OUTDOOR"
+          category: "Environmental"
+          priority: "MEDIUM"
+          slaCategory: "STANDARD"
+          serviceLevel: "SILVER"
+          assetType: "SOIL_MONITORING_UNIT"
+          issueDescription: "Elevated contamination readings near site perimeter sensors."
+          technicianRequiredSkill: "ENV_CERTIFIED"
+          createdAt: "2026-04-20T08:00:00Z"
