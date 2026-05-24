@@ -60,7 +60,7 @@ paths:
         Accepts a structured address and returns the resolved latitude/longitude coordinates
         along with normalized geographical metadata sourced from the external geolocation
         provider. All fields in the request body are optional individually, but at minimum
-        a resolvable combination of fields must be provided (e.g. `line1` + `city` + `country`).
+        a resolvable combination of fields must be provided (e.g. `line1` + `city` + `zipCode`).
       parameters:
         - name: x-consumer-app
           in: header
@@ -205,7 +205,7 @@ components:
       type: object
       description: >
         Structured address input for geocoding. At minimum, a resolvable combination
-        of fields must be provided. Recommended minimum: line1 + city + country.
+        of fields must be provided. Recommended minimum: line1 + city + zipCode.
       properties:
         line1:
           type: string
@@ -227,10 +227,6 @@ components:
           type: string
           description: ZIP or postal code
           example: "36611"
-        country:
-          type: string
-          description: Country name or ISO 3166-1 alpha-2 country code
-          example: "US"
 
     Coordinates:
       type: object
@@ -249,6 +245,23 @@ components:
           format: double
           description: Longitude in decimal degrees (WGS 84)
           example: -88.0737
+
+    Timezone:
+      type: object
+      description: Timezone information for the resolved location.
+      properties:
+        name:
+          type: string
+          description: IANA timezone identifier
+          example: "America/Chicago"
+        offsetStandard:
+          type: string
+          description: UTC offset during standard time (winter)
+          example: "-06:00"
+        offsetDST:
+          type: string
+          description: UTC offset during daylight saving time (summer)
+          example: "-05:00"
 
     NormalizedLocation:
       type: object
@@ -287,9 +300,7 @@ components:
           description: ISO 3166-1 alpha-2 country code
           example: "US"
         timezone:
-          type: string
-          description: IANA timezone identifier for the resolved location
-          example: "America/Chicago"
+          $ref: '#/components/schemas/Timezone'
 
     GeocodeResponse:
       type: object
@@ -301,7 +312,6 @@ components:
           $ref: '#/components/schemas/Coordinates'
         normalizedLocation:
           $ref: '#/components/schemas/NormalizedLocation'
-
 
     Fault:
       type: object
@@ -333,7 +343,6 @@ components:
         city: "Chickasaw"
         state: "Alabama"
         zipCode: "36611"
-        country: "US"
 
     GeocodeResponseExample:
       summary: Resolved coordinates and normalized location metadata
@@ -350,4 +359,7 @@ components:
           zipCode: "36611"
           country: "United States"
           countryCode: "US"
-          timezone: "America/Chicago"
+          timezone:
+            name: "America/Chicago"
+            offsetStandard: "-06:00"
+            offsetDST: "-05:00"
