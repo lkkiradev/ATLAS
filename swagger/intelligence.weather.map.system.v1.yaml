@@ -1,0 +1,365 @@
+openapi: 3.0.3
+info:
+  title: Weather Map System API
+  description: |
+    Purpose:
+    This API provides current weather data for a given geographic coordinate by
+    interfacing with an external weather provider. It returns operational weather
+    information relevant to field service dispatch and technician safety assessment.
+
+    Business Scope:
+    This is a System API used by internal applications that require real-time weather
+    conditions at a specific location. It acts as an abstraction layer over the external
+    weather provider, shielding consumers from third-party API contracts and changes.
+
+    Objective:
+    - Retrieve current weather conditions for a given latitude/longitude.
+    - Expose weather data in a normalized, operationally relevant format.
+    - Enable downstream systems to make dispatch and scheduling decisions based on weather.
+  version: 1.0.0
+  x-hopex:
+    - componentCode: CP000000
+  x-api-type: system
+  x-domain: intelligence
+  x-source-system:
+    - External Weather API
+  x-contacts:
+    - type: api-lead
+      name: HO Digital Factory Governance
+      email: ho.ApiDesignGov@optivio.com
+    - type: api-factory
+      name: core-it-factory
+      email: HO.core-it-factory@optivio.com
+  x-observability:
+    - tool: dynatrace
+      url: xxx/xxx/xxx
+      env: prod
+
+servers:
+  - url: https://digital-apis.optivio.com/intelligence/weather/map/system/v1
+    description: OptiVio internal Gateway PROD
+  - url: https://digital-apis-pre.optivio.com/intelligence/weather/map/system/v1
+    description: OptiVio internal Gateway PreProd
+  - url: https://digital-apis-uat.optivio.com/intelligence/weather/map/system/v1
+    description: OptiVio internal Gateway UAT
+
+tags:
+  - name: Weather
+    description: Operations for retrieving current weather conditions at a given location
+
+paths:
+
+  /weather/current:
+    get:
+      tags:
+        - Weather
+      operationId: getCurrentWeather
+      summary: Retrieve current weather conditions for a given coordinate
+      description: |
+        Returns current weather conditions for the specified latitude and longitude.
+        Coordinates are typically sourced from the Geolocation System API.
+        The `weatherCheckedAt` timestamp in the response indicates when the data
+        was last fetched from the external provider and should be used by consumers
+        to assess data freshness.
+      parameters:
+        - name: latitude
+          in: query
+          description: Latitude of the target location in decimal degrees (WGS 84)
+          required: true
+          schema:
+            type: number
+            format: double
+          example: 30.6954
+        - name: longitude
+          in: query
+          description: Longitude of the target location in decimal degrees (WGS 84)
+          required: true
+          schema:
+            type: number
+            format: double
+          example: -88.0737
+        - name: x-consumer-app
+          in: header
+          description: Name of the application consuming this API
+          required: true
+          schema:
+            type: string
+          example: "FIELD-OPS"
+      responses:
+        '200':
+          description: Successful Operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeatherResponse'
+              examples:
+                Example_Clear:
+                  $ref: '#/components/examples/WeatherResponseClearExample'
+                Example_Adverse:
+                  $ref: '#/components/examples/WeatherResponseAdverseExample'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        default:
+          $ref: '#/components/responses/Default'
+      security:
+        - oAuth2:
+            - 'weather:read:be'
+
+components:
+
+  securitySchemes:
+    oAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: 'https://auth.optivio.com/as/token.oauth2'
+          scopes:
+            'weather:read:be': Read access for weather data
+
+  responses:
+    BadRequest:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 400 Bad Request<br>
+        Code - BP_ERR<br>
+        Description - The request could not be understood or was missing required parameters.
+        Verify that latitude and longitude are valid decimal degree values.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    Unauthorized:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 401 Unauthorized<br>
+        Code - AUTH_ERR<br>
+        Description - Authentication credentials were missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    Forbidden:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 403 Forbidden<br>
+        Code - AUTHZ_ERR<br>
+        Description - The authenticated principal does not have permission to perform this action.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    InternalError:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 500 Internal Server Error<br>
+        Code - SVR_ERR<br>
+        Description - An error has occurred within the platform. Contact support if this persists.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    BadGateway:
+      description: >
+        hereunder fault datatype description<br>
+        Reason - 502 Bad Gateway<br>
+        Code - GW_ERR<br>
+        Description - The external weather provider returned an invalid or unexpected response.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+    Default:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+
+  schemas:
+
+    WeatherResponse:
+      type: object
+      description: Current weather conditions for the requested location.
+      required:
+        - weatherStatus
+        - weatherCondition
+        - temperatureCelsius
+        - feelsLikeCelsius
+        - precipitationLevel
+        - windSpeedKph
+        - windGustKph
+        - humidity
+        - visibilityMeters
+        - weatherAlertFlag
+        - weatherCheckedAt
+      properties:
+        weatherStatus:
+          type: string
+          description: >
+            Top-level operational weather status for the location.
+            CLEAR indicates conditions are suitable for field work.
+            ADVERSE indicates conditions may impact dispatch or technician safety.
+          enum: [CLEAR, ADVERSE]
+          example: "CLEAR"
+        weatherCondition:
+          type: string
+          description: >
+            Normalized descriptor of the current weather condition.
+            Used for human-readable display and secondary routing logic.
+          enum:
+            - SUNNY
+            - CLOUDY
+            - PARTLY_CLOUDY
+            - RAINY
+            - HEAVY_RAIN
+            - STORMY
+            - FOGGY
+            - SNOWY
+            - WINDY
+            - HAILING
+          example: "SUNNY"
+        temperatureCelsius:
+          type: number
+          format: double
+          description: Current temperature at the location in degrees Celsius
+          example: 28.4
+        feelsLikeCelsius:
+          type: number
+          format: double
+          description: >
+            Perceived temperature at the location in degrees Celsius, accounting
+            for humidity and wind chill. More operationally relevant than raw
+            temperature for technician safety assessments.
+          example: 31.2
+        precipitationLevel:
+          type: string
+          description: >
+            Normalized precipitation intensity level.
+            NONE indicates no active precipitation.
+          enum: [NONE, LOW, MODERATE, HIGH, EXTREME]
+          example: "NONE"
+        windSpeedKph:
+          type: number
+          format: double
+          description: >
+            Sustained wind speed at the location in kilometers per hour.
+            Consumers should use this value alongside windGustKph for
+            elevated or rooftop work safety checks.
+          example: 14.5
+        windGustKph:
+          type: number
+          format: double
+          description: >
+            Peak wind gust speed at the location in kilometers per hour.
+            Gusts are the primary wind safety indicator for elevated and
+            rooftop field work. Should be evaluated independently of windSpeedKph.
+          example: 27.4
+        humidity:
+          type: integer
+          description: >
+            Relative humidity at the location as a percentage (0-100).
+            High humidity affects technician safety in heat and is relevant
+            for electrical panel and HVAC asset types.
+          minimum: 0
+          maximum: 100
+          example: 82
+        visibilityMeters:
+          type: integer
+          description: >
+            Horizontal visibility at the location in meters.
+            Relevant for outdoor dispatch and driving safety assessments.
+            Maximum reported value is typically 10000 meters.
+          example: 10000
+        weatherAlertFlag:
+          type: boolean
+          description: >
+            Indicates whether an active weather alert or advisory has been issued
+            for the location. When true, downstream systems should apply additional
+            dispatch validation before scheduling outdoor or elevated work.
+          example: false
+        sunrise:
+          type: string
+          format: date-time
+          description: >
+            Sunrise time at the location in UTC. Used by scheduling systems
+            to determine the available daylight window for outdoor field work.
+          example: "2026-05-24T05:51:00Z"
+        sunset:
+          type: string
+          format: date-time
+          description: >
+            Sunset time at the location in UTC. Used by scheduling systems
+            to determine the available daylight window for outdoor field work.
+          example: "2026-05-24T19:41:00Z"
+        weatherCheckedAt:
+          type: string
+          format: date-time
+          description: >
+            Timestamp indicating when the weather data was last retrieved from the
+            external provider. Consumers should use this to assess data freshness
+            before making time-sensitive dispatch decisions.
+          example: "2026-05-24T08:00:00Z"
+
+    Fault:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+          description: >
+            HTTP error label or free-text cause such as: External Provider Unavailable,
+            Invalid Coordinates, Mandatory Field Missing, etc.
+          example: "400 Bad Request"
+        code:
+          type: string
+          description: Error identifier — application error code or provider error code.
+          example: "BP_ERR"
+        description:
+          type: string
+          description: Human-readable error description including relevant field and value context.
+          example: "Query parameter 'latitude' is missing or not a valid decimal degree value."
+
+  examples:
+
+    WeatherResponseClearExample:
+      summary: Clear weather conditions — suitable for field work
+      value:
+        weatherStatus: "CLEAR"
+        weatherCondition: "SUNNY"
+        temperatureCelsius: 28.4
+        feelsLikeCelsius: 31.2
+        precipitationLevel: "NONE"
+        windSpeedKph: 14.5
+        windGustKph: 27.4
+        humidity: 55
+        visibilityMeters: 10000
+        weatherAlertFlag: false
+        sunrise: "2026-05-24T05:51:00Z"
+        sunset: "2026-05-24T19:41:00Z"
+        weatherCheckedAt: "2026-05-24T08:00:00Z"
+
+    WeatherResponseAdverseExample:
+      summary: Adverse weather conditions, dispatch validation required
+      value:
+        weatherStatus: "ADVERSE"
+        weatherCondition: "STORMY"
+        temperatureCelsius: 17.1
+        feelsLikeCelsius: 13.8
+        precipitationLevel: "HIGH"
+        windSpeedKph: 82.0
+        windGustKph: 114.0
+        humidity: 94
+        visibilityMeters: 1200
+        weatherAlertFlag: true
+        sunrise: "2026-05-24T05:51:00Z"
+        sunset: "2026-05-24T19:41:00Z"
+        weatherCheckedAt: "2026-05-24T08:00:00Z"
