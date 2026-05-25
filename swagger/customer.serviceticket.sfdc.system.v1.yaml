@@ -719,7 +719,6 @@ components:
               example: "2026-05-12T14:30:00Z"
 
   
-
     Fault:
       type: object
       required:

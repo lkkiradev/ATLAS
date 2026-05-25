@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: Atlas Technician DynamoDB System API
+  title: Atlas Technician MongoDB System API
   description: |
     Purpose:
-    This API provides read access to technician data sourced from AWS DynamoDB.
+    This API provides read access to technician data sourced from MongoDB Atlas.
     It enables internal systems to retrieve technician profiles, specialties,
     and assigned service tickets.
 
@@ -16,14 +16,14 @@ info:
     Objective:
     - Expose technician profile and assignment data.
     - Enable consistent consumption of technician data across applications.
-    - Avoid direct access to the underlying DynamoDB instance by consumer systems.
+    - Avoid direct access to the underlying MongoDB Atlas instance by consumer systems.
   version: 1.0.0
   x-hopex:
     - componentCode: CP000000
   x-api-type: system
   x-domain: workforce
   x-source-system:
-    - DynamoDB AWS
+    - MongoDB Atlas
   x-contacts:
     - type: api-lead
       name: HO Digital Factory Governance
@@ -37,11 +37,11 @@ info:
       env: prod
 
 servers:
-  - url: https://digital-apis.optivio.com/workforce/technician/dynamodb/system/v1
+  - url: https://digital-apis.optivio.com/workforce/technician/mongodb/system/v1
     description: OptiVio internal Gateway PROD
-  - url: https://digital-apis-pre.optivio.com/workforce/technician/dynamodb/system/v1
+  - url: https://digital-apis-pre.optivio.com/workforce/technician/mongodb/system/v1
     description: OptiVio internal Gateway PreProd
-  - url: https://digital-apis-uat.optivio.com/workforce/technician/dynamodb/system/v1
+  - url: https://digital-apis-uat.optivio.com/workforce/technician/mongodb/system/v1
     description: OptiVio internal Gateway UAT
 
 tags:
@@ -488,7 +488,7 @@ components:
           example: "400 Bad Request"
         code:
           type: string
-          description: Error identifier — application error code, DynamoDB error code, etc.
+          description: Error identifier — application error code, MongoDB error code, etc.
           example: "BP_ERR"
         description:
           type: string
