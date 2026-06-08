@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Atlas Technician MongoDB System API
+  title: Technician MongoDB System API
   description: |
     Purpose:
     This API provides read access to technician data sourced from MongoDB Atlas.
