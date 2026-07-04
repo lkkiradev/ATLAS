@@ -1,0 +1,151 @@
+openapi: 3.0.3
+info:
+  title: Scheduling Process API
+  version: 1.0.0
+  description: |
+    Converts eligible service tickets into scheduled jobs by assigning
+    technicians and generating appointment windows.
+
+  x-api-type: process
+  x-domain: dispatch/scheduling
+
+servers:
+  - url: https://api.optivio.com/dispatch/scheduling/process/v1
+
+paths:
+
+  /schedules:
+    post:
+      summary: Schedule technician for a ticket
+      operationId: scheduleTicket
+      parameters:
+        - name: x-consumer-app
+          in: header
+          required: true
+          schema:
+            type: string
+          example: "ELIGIBILITY-WORKER"
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleRequest'
+
+      responses:
+        '200':
+          description: Ticket successfully scheduled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleResponse'
+
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+      security:
+        - oAuth2:
+            - serviceticket:write:be
+
+components:
+
+  securitySchemes:
+    oAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.optivio.com/as/token.oauth2
+          scopes:
+            serviceticket:write:be: Write ticket data
+
+  schemas:
+
+    ScheduleRequest:
+      type: object
+      required:
+        - ticketId
+        - requiredSkill
+        - priority
+        - slaCategory
+      properties:
+        ticketId:
+          type: string
+          example: "5008W00000VnXYZQAZ"
+        requiredSkill:
+          type: string
+          example: "PLUMBING_CERTIFIED"
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        slaCategory:
+          type: string
+          enum: [STANDARD, EXPRESS, EMERGENCY]
+        location:
+          type: object
+          properties:
+            latitude:
+              type: number
+            longitude:
+              type: number
+
+
+    ScheduleResponse:
+      type: object
+      required:
+        - ticketId
+        - assignedTechnicianId
+        - scheduledStart
+        - scheduledEnd
+        - scheduleStatus
+      properties:
+        ticketId:
+          type: string
+        assignedTechnicianId:
+          type: string
+          example: "TECH-102"
+        assignedTechnicianName:
+          type: string
+          example: "Juan Dela Cruz"
+        scheduledStart:
+          type: string
+          format: date-time
+        scheduledEnd:
+          type: string
+          format: date-time
+        scheduleStatus:
+          type: string
+          enum: [PENDING, CONFIRMED, FAILED]
+        assignmentReason:
+          type: string
+          example: "Closest available technician with required skill set"
+
+  responses:
+
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+
+  schemas:
+
+    Fault:
+      type: object
+      properties:
+        reason:
+          type: string
+        code:
+          type: string
+        description:
+          type: string

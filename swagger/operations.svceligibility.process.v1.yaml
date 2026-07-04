@@ -1,0 +1,334 @@
+openapi: 3.0.3
+info:
+  title: Service Eligibility Process API
+  description: |
+    Purpose:
+    This API orchestrates real-time service eligibility evaluation by aggregating
+    ticket data, geospatial information, and environmental conditions.
+
+    Business Scope:
+    This is a Process API responsible for applying centralized operational logic
+    to determine whether a service request can be safely executed.
+
+    Objective:
+    - Aggregate ticket, geolocation, and environmental data from multiple systems
+    - Evaluate operational risk using defined business rules
+    - Provide a definitive eligibility decision and recommended action
+    - Enable automated dispatch orchestration through event-driven workflows
+
+  version: 1.0.0
+
+  x-hopex:
+    - componentCode: CP000001
+
+  x-api-type: process
+  x-domain: operations/svceligibility
+
+  x-consumers:
+    - Event Workers
+    - Dispatcher Systems
+
+  x-downstream-dependencies:
+    - Customer Service Ticket SFDC System API
+    - Geolocation System API
+    - Weather System API
+
+  x-contacts:
+    - type: api-lead
+      name: HO Digital Factory Governance
+      email: ho.ApiDesignGov@optivio.com
+    - type: api-factory
+      name: core-it-factory
+      email: HO.core-it-factory@optivio.com
+
+  x-observability:
+    - tool: dynatrace
+      url: xxx/xxx/xxx
+      env: prod
+
+servers:
+  - url: https://digital-apis.optivio.com/operations/svceligibility/process/v1
+    description: OptiVio internal Gateway PROD
+  - url: https://digital-apis-pre.optivio.com/operations/svceligibility/process/v1
+    description: OptiVio internal Gateway PreProd
+  - url: https://digital-apis-uat.optivio.com/operations/svceligibility/process/v1
+    description: OptiVio internal Gateway UAT
+
+tags:
+  - name: Service Eligibility
+    description: Operations related to service ticket eligibility evaluation
+
+paths:
+
+  /eligibility/tickets/{id}:
+    get:
+      tags:
+        - Service Eligibility
+      operationId: evaluateEligibilityByTicketId
+
+      summary: Evaluate service eligibility for a ticket
+
+      description: |
+        Aggregates ticket data, geospatial coordinates, and live environmental conditions
+        to determine operational eligibility and risk level for a given service ticket.
+
+        The API evaluates business rules such as:
+        - Environmental safety (wind, precipitation, visibility)
+        - Service environment constraints (indoor/outdoor)
+        - Operational SLA risk exposure
+
+        The result determines whether dispatch can proceed, requires manual review, or must be blocked.
+
+      parameters:
+        - name: id
+          in: path
+          description: Unique Salesforce ticket identifier
+          required: true
+          schema:
+            type: string
+          example: "5008W00000VnXYZQAZ"
+
+        - name: x-consumer-app
+          in: header
+          description: Name of the application consuming this API
+          required: true
+          schema:
+            type: string
+          example: "EVENT-WORKER"
+
+      responses:
+
+        '200':
+          description: Successful eligibility evaluation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EligibilityResponse'
+              examples:
+                Example_1:
+                  $ref: '#/components/examples/EligibilityResponseExample'
+
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+        default:
+          $ref: '#/components/responses/Default'
+
+      security:
+        - oAuth2:
+            - 'serviceticket:read:be'
+
+components:
+
+  securitySchemes:
+    oAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.optivio.com/as/token.oauth2
+          scopes:
+            serviceticket:read:be: Read ticket data
+
+  responses:
+
+    NotFound:
+      description: >
+        Reason - 404 Not Found
+        Code - RES_ERR
+        Description - The requested ticket could not be found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+
+    BadRequest:
+      description: >
+        Reason - 400 Bad Request
+        Code - BP_ERR
+        Description - The request is invalid or malformed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+
+    Unauthorized:
+      description: >
+        Reason - 401 Unauthorized
+        Code - AUTH_ERR
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+
+    Forbidden:
+      description: >
+        Reason - 403 Forbidden
+        Code - AUTHZ_ERR
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+
+    InternalError:
+      description: >
+        Reason - 500 Internal Server Error
+        Code - SVR_ERR
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+
+    Default:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Fault'
+
+
+  schemas:
+
+    EligibilityResponse:
+      type: object
+      required:
+        - ticketId
+        - serviceEligibility
+        - riskLevel
+        - recommendedAction
+        - evaluatedAt
+      properties:
+        ticketId:
+          type: string
+          description: Unique SFDC ticket identifier
+          example: "5008W00000VnXYZQAZ"
+        serviceEligibility:
+          type: string
+          description: Final eligibility decision
+          enum: [ELIGIBLE, CONDITIONAL, NOT_ELIGIBLE]
+          example: "CONDITIONAL"
+        riskLevel:
+          type: string
+          description: Computed operational risk level
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+          example: "HIGH"
+        recommendedAction:
+          type: string
+          description: Recommended operational action
+          enum:
+            - PROCEED
+            - PROCEED_WITH_CAUTION
+            - REVIEW_REQUIRED
+            - RESCHEDULE
+            - BLOCK_DISPATCH
+          example: "PROCEED_WITH_CAUTION"
+        eligibilityReason:
+          type: string
+          description: Human-readable explanation of the decision
+          example: "High wind gusts detected beyond safe operating thresholds"
+        evaluatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when evaluation was performed
+        geo:
+          $ref: '#/components/schemas/GeocodeResponse'
+        weather:
+          $ref: '#/components/schemas/WeatherResponse'
+
+    GeocodeResponse:
+      type: object
+      description: Resolved coordinates and normalized location metadata
+      properties:
+        coordinates:
+          type: object
+          properties:
+            latitude:
+              type: number
+              example: 30.6954
+            longitude:
+              type: number
+              example: -88.0737
+        normalizedLocation:
+          type: object
+          properties:
+            formattedAddress:
+              type: string
+              example: "57236 Canary Road, Chickasaw, AL 36611, USA"
+            city:
+              type: string
+              example: "Chickasaw"
+            state:
+              type: string
+              example: "Alabama"
+            zipCode:
+              type: string
+              example: "36611"
+
+    WeatherResponse:
+      type: object
+      description: Weather condition snapshot used for evaluation
+      properties:
+        weatherStatus:
+          type: string
+          enum: [CLEAR, ADVERSE]
+          example: "ADVERSE"
+        weatherCondition:
+          type: string
+          example: "STORMY"
+        precipitationLevel:
+          type: string
+          enum: [LOW, MEDIUM, HIGH]
+          example: "HIGH"
+        windSpeedKph:
+          type: number
+          example: 82.0
+        windGustKph:
+          type: number
+          example: 114.0
+        weatherAlertFlag:
+          type: boolean
+          example: true
+
+    Fault:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+          example: "400 Bad Request"
+        code:
+          type: string
+          example: "BP_ERR"
+        description:
+          type: string
+          example: "The provided ticket ID is invalid or missing."
+
+examples:
+
+    EligibilityResponseExample:
+      summary: Eligibility evaluation result for adverse weather conditions
+      value:
+        ticketId: "5008W00000VnXYZQAZ"
+        serviceEligibility: "CONDITIONAL"
+        riskLevel: "HIGH"
+        recommendedAction: "PROCEED_WITH_CAUTION"
+        eligibilityReason: "High wind gusts detected beyond safe operating thresholds"
+        evaluatedAt: "2026-05-24T08:05:00Z"
+    
+    EligibilityBlockedExample:
+      summary: Service blocked due to extreme weather
+      value:
+        ticketId: "5008W00000VnXYZQAZ"
+        serviceEligibility: "NOT_ELIGIBLE"
+        riskLevel: "CRITICAL"
+        recommendedAction: "BLOCK_DISPATCH"
+        eligibilityReason: "Extreme storm conditions with hazardous wind speeds"
+        evaluatedAt: "2026-05-24T08:05:00Z"
