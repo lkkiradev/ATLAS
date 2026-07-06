@@ -992,8 +992,7 @@ components:
         scheduling:
           assignedTechnicianId: "TCH-ENV-5610"
           assignedTechnicianName: "Mitzi Prendergast"
-          scheduledStart: "2026-05-24T10:00:00Z"
-          scheduledEnd: "2026-05-24T12:00:00Z"
+          dueDate: "2026-05-24T12:00:00Z"
           scheduleStatus: "CONFIRMED"
           assignmentReason: "Closest available technician with required skill set"
           dispatchedAt: "2026-05-24T09:30:00Z"

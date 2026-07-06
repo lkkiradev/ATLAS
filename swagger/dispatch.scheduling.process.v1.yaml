@@ -97,8 +97,7 @@ components:
       required:
         - ticketId
         - assignedTechnicianId
-        - scheduledStart
-        - scheduledEnd
+        - dueDate
         - scheduleStatus
       properties:
         ticketId:
@@ -109,10 +108,7 @@ components:
         assignedTechnicianName:
           type: string
           example: "Juan Dela Cruz"
-        scheduledStart:
-          type: string
-          format: date-time
-        scheduledEnd:
+        dueDate:
           type: string
           format: date-time
         scheduleStatus:
