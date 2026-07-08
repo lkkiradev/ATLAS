@@ -15,7 +15,7 @@ info:
     - Expose service ticket data for read and write operations.
     - Enable consistent consumption of ticket data across applications.
     - Avoid direct access to the underlying Salesforce instance by consumer systems.
-  version: 1.0.0
+  version: 1.0.1
   x-hopex:
     - componentCode: CP000000
   x-api-type: system
